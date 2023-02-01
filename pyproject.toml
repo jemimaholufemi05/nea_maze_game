@@ -8,12 +8,13 @@ packages = [{include = "nea_maze_game"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-Panda3D = "3.10"
+Panda3D = "1.10.13"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.991"
-black = "flake8"
 pytest = "^7.2.1"
+black = "^23.1.0"
+flake8 = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
