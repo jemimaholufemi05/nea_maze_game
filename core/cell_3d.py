@@ -33,3 +33,4 @@ class Cell3D(Cell):
         self.up and list.append(self.up)
         self.down and list.append(self.down)
         return list
+              

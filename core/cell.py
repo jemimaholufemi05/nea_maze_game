@@ -77,11 +77,11 @@ class Cell:
         return list
     
     def __eq__(self, other_cell: Optional["Cell"]) -> bool:       # type: ignore
-        if not is_cell(other_cell) or other_cell is None:
+        if not self.is_cell(other_cell) or other_cell is None:
             return False
         return self.row == other_cell.row and self.column == other_cell.column
     
-    def is_cell(cell: Any) -> bool:
+    def is_cell(self, cell: Any) -> bool:
         return isinstance(cell, Cell)
     
     
