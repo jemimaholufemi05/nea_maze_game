@@ -1,4 +1,4 @@
-from cell import Cell
+from core.cell import Cell
 from random import randrange
 
 class Grid:
@@ -10,6 +10,10 @@ class Grid:
     @property
     def columns(self) -> int:
         return self._columns
+    
+    @property
+    def grid(self) -> int:
+        return self._grid
 
     @property
     def size(self) -> int:
@@ -19,7 +23,7 @@ class Grid:
         self._rows = rows
         self._columns = columns
         
-        self.grid = self.prepare_grid()
+        self._grid = self.prepare_grid()
         self.configure_cells()
     
     def __setitem__(self, item, value: Cell):

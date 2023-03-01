@@ -1,3 +1,4 @@
+from core.grid_3d import Grid3D
 from direct.showbase.ShowBase import ShowBase
 
 from direct.actor.Actor import Actor
@@ -7,10 +8,11 @@ from panda3d.core import WindowProperties
 
 
 class Game(ShowBase):
-    def __init__(self):
+    def __init__(self, grid):
         ShowBase.__init__(self)
         render.setShaderAuto()
 
+        self.grid = grid
         self.init_lighting()
         self.init_window(1000, 750)
         self.init_models()
@@ -92,6 +94,6 @@ class Game(ShowBase):
         self.ambientLightNodePath = render.attachNewNode(ambientLight)
         render.setLight(self.ambientLightNodePath)
 
-
-game = Game()
+grid3d = Grid3D(3, 3, 3)
+game = Game(grid3d)
 game.run()

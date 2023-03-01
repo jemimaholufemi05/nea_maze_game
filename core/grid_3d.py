@@ -1,18 +1,15 @@
-from grid import Grid
-from cell_3d import Cell3D
-from cell import Cell
 import random
+from core.cell_3d import Cell3D
+from core.cell import Cell 
+from core.grid import Grid
 
 
 class Grid3D(Grid):
     @property
     def levels(self):
         return self._levels
-    @property
-    def grid(self):
-        return self._grid
-
-    def __init__(self, levels, rows, columns):
+    
+    def __init__(self, levels: int, rows: int, columns: int):
         self._levels = levels
 
         super().__init__(rows, columns)
@@ -41,7 +38,7 @@ class Grid3D(Grid):
             cell.down = self[level - 1, row, column]
             cell.up = self[level + 1, row, column]
 
-    def __setitem__(self, item, value: Cell):
+    def __setitem__(self, item, value: Cell3D):
         level, row, column = item
         self.grid[level][row][column] = value
 
@@ -59,7 +56,7 @@ class Grid3D(Grid):
     def random_cell(self):
         level = random.randrange(0, self.levels)
         row = random.randrange(0, self.rows)
-        column = random.randint(0, self.columns)
+        column = random.randrange(0, self.columns)
         
         return self.grid[level][row][column]
 
