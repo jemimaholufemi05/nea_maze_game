@@ -9,6 +9,7 @@ packages = [{include = "nea_maze_game"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 Panda3D = "1.10.13"
+Pillow = "^9.4.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^0.991"

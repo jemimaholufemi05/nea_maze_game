@@ -1,7 +1,7 @@
 
 
 from random import choice
-from grid import Grid
+from core.grid import Grid
 
 class BinaryTree:
     @classmethod

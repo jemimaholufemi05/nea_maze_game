@@ -1,5 +1,6 @@
 from bricks import Bricks
-from core.grid_3d import Grid3D
+from core.grid import Grid
+from core.binary_tree import BinaryTree
 from direct.showbase.ShowBase import ShowBase
 from direct.actor.Actor import Actor
 from panda3d.core import (
@@ -223,7 +224,9 @@ class Game:
         ## self.environment = loader.loadModel("models/Misc/environment")
         # self.environment.reparentTo(render)
         self.bricks = Bricks(root=self.render, columns=False, back_side=True)
-        self.bricks.load_from_image("test_map.png")
+        BinaryTree.on(self.grid)
+        self.grid.to_png().save("grid_image.png", "PNG", optimize=True)
+        self.bricks.load_from_image("grid_image.png")
         self.player = Actor(
             "models/PandaChan/act_p3d_chan", {"walk": "models/PandaChan/a_p3d_chan_run"}
         )
@@ -259,7 +262,7 @@ class Game:
 
 
 if __name__ == "__main__":
-    grid = Grid3D(3, 3, 3)
+    grid = Grid(8, 8)
     base = ShowBase()
     game = Game(grid, base)
     base.run()
