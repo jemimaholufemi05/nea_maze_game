@@ -1,13 +1,20 @@
+from bricks import Bricks
+from core.grid_3d import Grid3D
 from direct.showbase.ShowBase import ShowBase
-
 from direct.actor.Actor import Actor
-from panda3d.core import Spotlight, AmbientLight, DirectionalLight
-from panda3d.core import Vec4, Vec3
-from panda3d.core import WindowProperties, NodePath, PandaNode
-
+from panda3d.core import (
+    AmbientLight,
+    DirectionalLight,
+    Vec4,
+    WindowProperties,
+    NodePath,
+    PandaNode,
+)
 
 class Game:
-    def __init__(self, base):
+
+    def __init__(self, grid, base):
+        self.grid = grid
         self.init_showBase(base)
         self.init_variables()
         self.init_lighting()
@@ -15,10 +22,51 @@ class Game:
         self.init_models()
         self.init_camera()
         self.init_key_map()
-        
+
         self.updateTask = self.taskMgr.add(self.update, "update")
         self.taskMgr.add(self.updateCam, "task_camActualisation", priority=-4)
-        
+
+    def update_key_map(self, controlName, controlState):
+        self.keyMap[controlName] = controlState
+
+    def update(self, task):
+        dt = globalClock.getDt()
+        if self.keyMap["left"]:
+            self.player.setH(self.player.getH() + 300 * dt)
+        if self.keyMap["right"]:
+            self.player.setH(self.player.getH() - 300 * dt)
+        if self.keyMap["forward"]:
+            self.player.setY(self.player, -25 * dt)
+        if self.keyMap["up"]:
+            self.player.setZ(self.player.getZ() + 25 * dt)
+        if self.keyMap["down"]:
+            self.player.setZ(self.player.getZ() - 25 * dt)
+
+        return task.cont
+
+    def init_key_map(self):
+        self.keyMap = {
+            "left": False,
+            "right": False,
+            "forward": False,
+            "up": False,
+            "down": False,
+            "center": False,
+        }
+
+        self.accept("w", self.update_key_map, ["up", True])
+        self.accept("w-up", self.update_key_map, ["up", False])
+        self.accept("s", self.update_key_map, ["down", True])
+        self.accept("s-up", self.update_key_map, ["down", False])
+        self.accept("arrow_left", self.update_key_map, ["left", True])
+        self.accept("arrow_right", self.update_key_map, ["right", True])
+        self.accept("arrow_up", self.update_key_map, ["forward", True])
+        self.accept("arrow_left-up", self.update_key_map, ["left", False])
+        self.accept("arrow_right-up", self.update_key_map, ["right", False])
+        self.accept("arrow_up-up", self.update_key_map, ["forward", False])
+        self.accept("q", self.update_key_map, ["center", True])
+        self.accept("q-up", self.update_key_map, ["center", False])
+
     def init_showBase(self, base):
         self.base = base
         self.render = base.render
@@ -28,8 +76,7 @@ class Game:
         self.taskMgr = base.taskMgr
         self.camera = base.camera
         self.render.setShaderAuto()
-        self.loader = base.loader
-        
+
     def init_variables(self):
         # a time to keep the cam zoom at a specific speed independent of
         # current framerate
@@ -41,7 +88,9 @@ class Game:
         # the initial cam distance
         self._camDistance = (
             self._maxCamDistance - self._minCamDistance
-        ) / 2.0 + self._minCamDistance   
+        ) / 2.0 + self._minCamDistance
+        # the next two vars set the min and max distance on the Z-Axis to the
+        # node the cam is attached to
         self._maxCamHeightDist = 4.0
         self._minCamHeightDist = 2.0
         # the average camera height
@@ -49,16 +98,17 @@ class Game:
             self._maxCamHeightDist - self._minCamHeightDist
         ) / 2.0 + self._minCamHeightDist
         # the initial cam height
-        self._camHeight = self._camHeightAvg
-        # a time to keep the cam zoom at a specific speed independent of  
+        self._camHeight = self.camHeightAvg
+        # a time to keep the cam zoom at a specific speed independent of
+
     @property
     def maxCamDistance(self):
         return self._maxCamDistance
-    
+
     @property
     def minCamDistance(self):
         return self._minCamDistance
-     
+
     @property
     def maxCamHeightDist(self):
         return self._maxCamHeightDist
@@ -74,8 +124,7 @@ class Game:
     @property
     def camDistance(self):
         return self._minCamDistance
-    
-        
+
     def zoom(self, zoom_in):
         if zoom_in:
             if self.maxCamDistance > self.minCamDistance:
@@ -85,24 +134,7 @@ class Game:
             if self.maxCamDistance < 15:  # the default maximum
                 self.maxCamDistance += 0.5
             self.acceptOnce("-", self.zoom, [False])
-            
-    def update_key_map(self, controlName, controlState):
-        self.keyMap[controlName] = controlState
 
-    def update(self, task):
-       dt = globalClock.getDt()
-       if self.keyMap["left"]:
-            self.player.setH(self.player.getH() + 300 * dt)
-       if self.keyMap["right"]:
-            self.player.setH(self.player.getH() - 300 * dt)
-       if self.keyMap["forward"]:
-            self.player.setY(self.player, -25 * dt)
-       if self.keyMap["up"]:
-            self.player.setZ(self.player.getZ() + 25 * dt)
-       if self.keyMap["down"]:
-            self.player.setZ(self.player.getZ() - 25 * dt)
-       return task.cont
-   
     def updateCam(self, task):
         """This function will check the min and max distance of the camera to
         the defined model and will correct the position if the cam is to close
@@ -115,7 +147,7 @@ class Game:
         camdist = camvec.length()
         camvec.normalize()
 
-    # if far from player start following
+        # if far from player start following
         if camdist > self.maxCamDistance:
             self.camera.setPos(
                 self.camera.getPos() + camvec * (camdist - self.maxCamDistance)
@@ -135,7 +167,7 @@ class Game:
             self.camera.setZ(self.player.getZ() + self.minCamHeightDist)
             offsetZ = self.minCamHeightDist
         elif offsetZ > self.maxCamHeightDist:
-        # the cam is to high, so move it down
+            # the cam is to high, so move it down
             self.camera.setZ(self.player.getZ() + self.maxCamHeightDist)
             offsetZ = self.maxCamHeightDist
         # lazy camera positioning
@@ -160,49 +192,38 @@ class Game:
                     if newOffsetZ > self.camHeightAvg:
                         # set the cam z position to exactly the desired offset
                         self.camera.setZ(self.player.getZ() + self.camHeightAvg)
-            # center the camera as long as the center key is pressed
+
+                    # center the camera as long as the center key is pressed
         if self.keyMap["center"]:
             self.camera.setPos(self.player, 0, camdist, offsetZ)
-        # let the camera look at the floater
-        self.camera.lookAt(self.camFloater)
-
-        # continue the task until it got manually stopped
-        return task.cont
 
         # let the camera look at the floater
         self.camera.lookAt(self.camFloater)
 
         # continue the task until it got manually stopped
         return task.cont
-    
-    def init_key_map(self):
-        self.keyMap = {
-            "left": False,
-            "right": False,
-            "forward": False,
-            "up": False,
-            "down": False,
-            "center": False,
-        }
-        self.accept("w", self.update_key_map, ["up", True])
-        self.accept("w-up", self.update_key_map, ["up", False])
-        self.accept("s", self.update_key_map, ["down", True])
-        self.accept("arrow_up", self.update_key_map, ["forward", True])
-        self.accept("arrow_left-up", self.update_key_map, ["left", False])
-        self.accept("arrow_right-up", self.update_key_map, ["right", False])
-        self.accept("arrow_up-up", self.update_key_map, ["forward", False])
-        self.accept("q", self.update_key_map, ["center", True])
-        self.accept("q-up", self.update_key_map, ["center", False])      
-    
+
     def init_camera(self):
         self.base.disableMouse()
         self.base.acceptOnce("+", self.zoom, [True])
         self.base.acceptOnce("-", self.zoom, [False])
 
-    def init_models(self):
-        self.environment = self.loader.loadModel("models/Misc/environment")
-        self.environment.reparentTo(self.render)
+    def rotate_camera(self, heading, pitch):
+        # Get the current camera hpr
+        hpr = self.camera.getHpr()
 
+        # Calculate the new hpr values by adding the rotation angles
+        new_h = (hpr[0] + heading) % 360
+        new_p = max(min(hpr[1] + pitch, 90), -90)  # Limit pitch to -90 to 90 degrees
+
+        # Set the new hpr values
+        self.camera.setHpr(new_h, new_p, 0)
+
+    def init_models(self):
+        ## self.environment = loader.loadModel("models/Misc/environment")
+        # self.environment.reparentTo(render)
+        self.bricks = Bricks(root=self.render, columns=False, back_side=True)
+        self.bricks.load_from_image("test_map.png")
         self.player = Actor(
             "models/PandaChan/act_p3d_chan", {"walk": "models/PandaChan/a_p3d_chan_run"}
         )
@@ -236,6 +257,9 @@ class Game:
         self.ambientLightNodePath = self.render.attachNewNode(ambientLight)
         self.render.setLight(self.ambientLightNodePath)
 
-base = ShowBase()
-game = Game(base)
-base.run()
+
+if __name__ == "__main__":
+    grid = Grid3D(3, 3, 3)
+    base = ShowBase()
+    game = Game(grid, base)
+    base.run()
