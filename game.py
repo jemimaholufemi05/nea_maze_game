@@ -2,6 +2,7 @@ from bricks import Bricks
 from core.grid import Grid
 from core.binary_tree import BinaryTree
 from direct.showbase.ShowBase import ShowBase
+from panda3d.core import CollisionTraverser, CollisionHandlerPusher, CollisionSphere, CollisionTube, CollisionNode
 from direct.actor.Actor import Actor
 from panda3d.core import (
     AmbientLight,
@@ -23,6 +24,47 @@ class Game:
         self.init_models()
         self.init_camera()
         self.init_key_map()
+        
+        # collision detection 
+        # self.pusher = base.pusher
+        # self.cTrav = base.cTrav
+        self.pusher = CollisionHandlerPusher()
+        self.cTrav = CollisionTraverser()
+
+        self.pusher.setHorizontal(True)
+
+        colliderNode = CollisionNode("player")
+        colliderNode.addSolid(CollisionSphere(0, 0, 0, 0.3))
+        collider = self.player.attachNewNode(colliderNode)
+
+        self.pusher.addCollider(collider, self.player)
+        self.cTrav.addCollider(collider, self.pusher)
+
+        wallSolid = CollisionTube(-8.0, 0, 0, 8.0, 0, 0, 0.2)
+        wallNode = CollisionNode("wall")
+        wallNode.addSolid(wallSolid)
+        wall = render.attachNewNode(wallNode)
+        wall.setY(8.0)
+
+        wallSolid = CollisionTube(-8.0, 0, 0, 8.0, 0, 0, 0.2)
+        wallNode = CollisionNode("wall")
+        wallNode.addSolid(wallSolid)
+        wall = render.attachNewNode(wallNode)
+        wall.setY(-8.0)
+
+        wallSolid = CollisionTube(0, -8.0, 0, 0, 8.0, 0, 0.2)
+        wallNode = CollisionNode("wall")
+        wallNode.addSolid(wallSolid)
+        wall = render.attachNewNode(wallNode)
+        wall.setX(8.0)
+
+        wallSolid = CollisionTube(0, -8.0, 0, 0, 8.0, 0, 0.2)
+        wallNode = CollisionNode("wall")
+        wallNode.addSolid(wallSolid)
+        wall = render.attachNewNode(wallNode)
+        wall.setX(-8.0)
+        collider.show()
+        # end collision detection 
 
         self.updateTask = self.taskMgr.add(self.update, "update")
         self.taskMgr.add(self.updateCam, "task_camActualisation", priority=-4)
