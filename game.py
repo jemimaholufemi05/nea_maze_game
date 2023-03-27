@@ -1,8 +1,6 @@
 from bricks import Bricks
 from core.grid import Grid
-from core.binary_tree import BinaryTree
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import CollisionTraverser, CollisionHandlerPusher, CollisionSphere, CollisionTube, CollisionNode
 from direct.actor.Actor import Actor
 from panda3d.core import (
     AmbientLight,
@@ -11,63 +9,95 @@ from panda3d.core import (
     WindowProperties,
     NodePath,
     PandaNode,
+    CollisionHandlerPusher,
+    CollisionHandlerQueue,
+    CollisionTraverser,
+    CollisionSphere,
+    CollisionNode,
+    BitMask32,
 )
 
-class Game:
+from path_finding.NavGraph import NavGraph
 
-    def __init__(self, grid, base):
+
+class Game:
+    def __init__(self, grid, base, Bricks, NavGraph):
         self.grid = grid
+
         self.init_showBase(base)
         self.init_variables()
         self.init_lighting()
         self.init_window(1000, 750)
-        self.init_models()
+        self.init_models(Bricks, NavGraph)
         self.init_camera()
         self.init_key_map()
-        
-        # collision detection 
-        # self.pusher = base.pusher
-        # self.cTrav = base.cTrav
+
+        # collision handling
+        self.collision_traverser = CollisionTraverser()
         self.pusher = CollisionHandlerPusher()
-        self.cTrav = CollisionTraverser()
+        self.queue = CollisionHandlerQueue()
 
-        self.pusher.setHorizontal(True)
+        # create a collision node for the player
+        self.player_collision_node = CollisionNode("player_collision_node")
+        self.player_collision_node.set_from_collide_mask(BitMask32.bit(1))
+        self.player_collision_node.set_into_collide_mask(BitMask32.bit(1))
 
-        colliderNode = CollisionNode("player")
-        colliderNode.addSolid(CollisionSphere(0, 0, 0, 0.3))
-        collider = self.player.attachNewNode(colliderNode)
+        # create a collision sphere that matches the player size
+        player_size = 1.0
+        player_collision_sphere = CollisionSphere(0, 0, 0, player_size)
 
-        self.pusher.addCollider(collider, self.player)
-        self.cTrav.addCollider(collider, self.pusher)
+        # add the collision sphere to the player collision node
+        self.player_collision_node.add_solid(player_collision_sphere)
 
-        wallSolid = CollisionTube(-8.0, 0, 0, 8.0, 0, 0, 0.2)
-        wallNode = CollisionNode("wall")
-        wallNode.addSolid(wallSolid)
-        wall = render.attachNewNode(wallNode)
-        wall.setY(8.0)
+        # attach the player collision node to the player node
+        self.player_collision_node_path = self.player.attach_new_node(
+            self.player_collision_node
+        )
+        self.player_collision_node_path.set_pos(0, 0, 0.6)
 
-        wallSolid = CollisionTube(-8.0, 0, 0, 8.0, 0, 0, 0.2)
-        wallNode = CollisionNode("wall")
-        wallNode.addSolid(wallSolid)
-        wall = render.attachNewNode(wallNode)
-        wall.setY(-8.0)
+        # add the player collision node to the collision traverser
+        self.collision_traverser.add_collider(
+            self.player_collision_node_path, self.queue
+        )
 
-        wallSolid = CollisionTube(0, -8.0, 0, 0, 8.0, 0, 0.2)
-        wallNode = CollisionNode("wall")
-        wallNode.addSolid(wallSolid)
-        wall = render.attachNewNode(wallNode)
-        wall.setX(8.0)
-
-        wallSolid = CollisionTube(0, -8.0, 0, 0, 8.0, 0, 0.2)
-        wallNode = CollisionNode("wall")
-        wallNode.addSolid(wallSolid)
-        wall = render.attachNewNode(wallNode)
-        wall.setX(-8.0)
-        collider.show()
-        # end collision detection 
-
+        self.bricks.load_from_image(
+            NavGraph, self.collision_traverser, self.pusher, "test_map.png"
+        )
         self.updateTask = self.taskMgr.add(self.update, "update")
         self.taskMgr.add(self.updateCam, "task_camActualisation", priority=-4)
+        self.taskMgr.add(self.updatePlayerBrick, "update_player_brick")
+
+    def updatePlayerBrick(self, task):
+        # handle collisions
+        self.collision_traverser.traverse(self.bricks.level)
+        # check for collisions with the player and bricks
+        if self.queue.get_num_entries() > 0:
+            self.queue.sort_entries()
+            for i in range(self.queue.get_num_entries()):
+                entry = self.queue.get_entry(i)
+                if entry.get_into_node().get_name().startswith("brick_collision_node"):
+                    # move the player back to its previous position
+                    self.player.set_pos(self.prev_player_pos)
+                    break
+
+        # store the previous player position for collision handling
+        self.prev_player_pos = self.player.get_pos()
+
+        return task.cont
+
+    # A method to clean up on quitting
+    def cleanup(self):
+        if self.pusher is not None:
+            self.pusher.removeCollider(self.player.collider)
+            self.pusher = None
+
+        if self.collision_traverser is not None:
+            self.collision_traverser.removeCollider(self.player.collider)
+            self.collision_traverser = None
+
+        if self.player is not None:
+            self.player.cleanup()
+            self.player = None
 
     def update_key_map(self, controlName, controlState):
         self.keyMap[controlName] = controlState
@@ -223,22 +253,23 @@ class Game:
                     self.camera.setZ(self.camera.getZ() - 5 * dt)
                     newOffsetZ = self.camera.getZ() - self.player.getZ()
                     # check if the cam has reached the desired offset
-                    if newOffsetZ < self.camHeightAvg:
-                        # set the cam z position to exactly the desired offset
-                        self.camera.setZ(self.player.getZ() + self.camHeightAvg)
+                    # set the cam z position to exactly the desired offset
+                    newOffsetZ < self.camHeightAvg and self.camera.setZ(
+                        self.player.getZ() + self.camHeightAvg
+                    )
                 else:
                     # the cam is lower then the average cam height above the player
                     # so move it slowly up
                     self.camera.setZ(self.camera.getZ() + 5 * dt)
                     newOffsetZ = self.camera.getZ() - self.player.getZ()
                     # check if the cam has reached the desired offset
-                    if newOffsetZ > self.camHeightAvg:
-                        # set the cam z position to exactly the desired offset
-                        self.camera.setZ(self.player.getZ() + self.camHeightAvg)
+                    # set the cam z position to exactly the desired offset
+                    newOffsetZ > self.camHeightAvg and self.camera.setZ(
+                        self.player.getZ() + self.camHeightAvg
+                    )
 
                     # center the camera as long as the center key is pressed
-        if self.keyMap["center"]:
-            self.camera.setPos(self.player, 0, camdist, offsetZ)
+        self.keyMap["center"] and self.camera.setPos(self.player, 0, camdist, offsetZ)
 
         # let the camera look at the floater
         self.camera.lookAt(self.camFloater)
@@ -262,22 +293,17 @@ class Game:
         # Set the new hpr values
         self.camera.setHpr(new_h, new_p, 0)
 
-    def init_models(self):
+    def init_models(self, Bricks, NavGraph):
         ## self.environment = loader.loadModel("models/Misc/environment")
         # self.environment.reparentTo(render)
-        self.bricks = Bricks(root=self.render, columns=False, back_side=True)
-        BinaryTree.on(self.grid)
-        self.grid.to_png().save("grid_image.png", "PNG", optimize=True)
-        self.bricks.load_from_image("grid_image.png")
+        self.bricks = Bricks(self.base, columns=False, back_side=True)
         self.player = Actor(
             "models/PandaChan/act_p3d_chan", {"walk": "models/PandaChan/a_p3d_chan_run"}
         )
         # self.player.getChild(0).setH(180)
-        self.player.reparentTo(self.render)
         self.player.setPos(0, 7, 0)
         self.player.reparentTo(self.render)
         # self.player.setPos(0, 10, 1)
-        self.player.reparentTo(self.render)
         self.camFloater = NodePath(PandaNode("playerCamFloater"))
         # the following will set an offset to the node this floater is attached to
         self.camFloater.setPos(0, 0, 1)
@@ -304,7 +330,7 @@ class Game:
 
 
 if __name__ == "__main__":
-    grid = Grid(8, 8)
+    grid = Grid(7, 7)
     base = ShowBase()
-    game = Game(grid, base)
+    game = Game(grid, base, Bricks, NavGraph)
     base.run()

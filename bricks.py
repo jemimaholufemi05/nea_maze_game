@@ -1,18 +1,22 @@
-from panda3d.core import NodePath, PNMImage
-
-from path_finding.NavGraph import NavGraph
+from panda3d.core import NodePath, PNMImage, CollisionNode, CollisionBox, BitMask32
 
 
 class Bricks:
+    @property
+    def level(self):
+        return self._level
+
     """docstring for Bricks."""
 
-    def __init__(self, root, columns, back_side=False):
+    def __init__(self, base, columns, back_side=False):
+        self.base = base
+        self.root = base.render
         self.columns = columns
         self.base_side = back_side
         self.base_bricks = self.load_base_bricks()
         self.exit_placement = self.map_exits()
         self.load_bricks_with_corresponding_exits(self.exit_placement)
-        self.level = root.attach_new_node("level")
+        self._level = self.root.attach_new_node("level")
         self.layout = {}
         self.vis = None
 
@@ -37,7 +41,7 @@ class Bricks:
             frozenset((0, 2, 3)): NodePath("brick_with_3_exits_east_walled"),
             frozenset((1, 2, 3)): NodePath("brick_with_3_exits_north_walled"),
             frozenset((0, 1)): NodePath("brick_with_2_exits_south_west_walled"),
-            frozenset((0,2)): NodePath('brick_with_2_exits_east_west_walled'),
+            frozenset((0, 2)): NodePath("brick_with_2_exits_east_west_walled"),
             frozenset((0, 3)): NodePath("brick_with_2_exits_east_south_walled"),
             frozenset((1, 2)): NodePath("brick_with_2_exits_north_west_walled"),
             frozenset((2, 3)): NodePath("brick_with_2_exits_north_east_walled"),
@@ -80,10 +84,23 @@ class Bricks:
             nav.flatten_strong()
             nav.hide()
 
-    def generate(self, brick_size=4):
+    def generate(self, NavGraph, trav, queue, brick_size=4):
         for (x, y), brick in self.layout.items():
-            node = self.exit_placement[brick].copy_to(self.level)
-            node.set_pos(x * brick_size, y * brick_size, 0)
+            brick_node = self.exit_placement[brick].copy_to(self.level)
+            brick_node.set_pos(x * brick_size, y * brick_size, 0)
+
+            brick_collision_node = CollisionNode(f"brick_collision_node_{x}_{y}")
+            brick_collision_node.set_into_collide_mask(BitMask32.bit(1))
+            brick_collision_node.set_from_collide_mask(BitMask32.bit(1))
+
+            brick_collision_box = CollisionBox(
+                (-brick_size / 2, -brick_size / 2, 0),
+                (brick_size / 2, brick_size / 2, brick_size),
+            )
+            brick_collision_node.add_solid(brick_collision_box)
+
+            brick_collision_node_path = brick_node.attach_new_node(brick_collision_node)
+            trav.add_collider(brick_collision_node_path, queue)
 
         nav_mesh = NodePath("navmesh")
         for node in self.level.find_all_matches("**/nav"):
@@ -92,9 +109,8 @@ class Bricks:
         nav_mesh.flatten_strong()
         self.navgraph = NavGraph(mesh=nav_mesh.get_child(0), draw_graph=False)
         nav_mesh.remove_node()
-        
-        self.level.flatten_strong()
 
+        self.level.flatten_strong()
 
     def make_brick_at(self, x, y):
         if (x, y) not in self.layout:
@@ -119,11 +135,11 @@ class Bricks:
         self.make_brick_at(x, y - 1)
         self.make_brick_at(x, y + 1)
 
-    def load_from_image(self, img_file):
+    def load_from_image(self, NavGraph, trav, pusher, img_file):
         img = PNMImage()
         img.read(img_file)
         for x in range(img.get_x_size()):
             for y in range(img.get_y_size()):
-                if img.get_gray(x, y) < 0.5:
-                    self.add(x, y)
-        self.generate()
+                img.get_gray(x, y) < 0.5 and self.add(x, y)
+
+        self.generate(NavGraph, trav, pusher)
