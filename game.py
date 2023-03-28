@@ -61,7 +61,7 @@ class Game:
         )
 
         self.bricks.load_from_image(
-            NavGraph, self.collision_traverser, self.pusher, "test_map.png"
+             "test_map.png"
         )
         self.updateTask = self.taskMgr.add(self.update, "update")
         self.taskMgr.add(self.updateCam, "task_camActualisation", priority=-4)
@@ -296,7 +296,7 @@ class Game:
     def init_models(self, Bricks, NavGraph):
         ## self.environment = loader.loadModel("models/Misc/environment")
         # self.environment.reparentTo(render)
-        self.bricks = Bricks(self.base, columns=False, back_side=True)
+        self.bricks = Bricks(root =self.render, columns=False, back_side=True)
         self.player = Actor(
             "models/PandaChan/act_p3d_chan", {"walk": "models/PandaChan/a_p3d_chan_run"}
         )

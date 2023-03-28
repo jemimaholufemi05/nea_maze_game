@@ -1,4 +1,4 @@
-from panda3d.core import NodePath, PNMImage, CollisionNode, CollisionBox, BitMask32
+from panda3d.core import NodePath, PNMImage, CollisionNode, CollisionBox, BitMask32, CollisionTraverser, CollisionHandlerPusher, CollisionHandlerQueue
 
 
 class Bricks:
@@ -8,9 +8,8 @@ class Bricks:
 
     """docstring for Bricks."""
 
-    def __init__(self, base, columns, back_side=False):
-        self.base = base
-        self.root = base.render
+    def __init__(self, root, columns, back_side=False):
+        self.root = root
         self.columns = columns
         self.base_side = back_side
         self.base_bricks = self.load_base_bricks()
@@ -18,6 +17,9 @@ class Bricks:
         self.load_bricks_with_corresponding_exits(self.exit_placement)
         self._level = self.root.attach_new_node("level")
         self.layout = {}
+        self.collision_traverser = CollisionTraverser()
+        self.pusher = CollisionHandlerPusher()
+        self.queue = CollisionHandlerQueue()
         self.vis = None
 
     def load_base_bricks(self):
@@ -84,7 +86,7 @@ class Bricks:
             nav.flatten_strong()
             nav.hide()
 
-    def generate(self, NavGraph, trav, queue, brick_size=4):
+    def generate(self, brick_size=4):
         for (x, y), brick in self.layout.items():
             brick_node = self.exit_placement[brick].copy_to(self.level)
             brick_node.set_pos(x * brick_size, y * brick_size, 0)
@@ -100,17 +102,19 @@ class Bricks:
             brick_collision_node.add_solid(brick_collision_box)
 
             brick_collision_node_path = brick_node.attach_new_node(brick_collision_node)
-            trav.add_collider(brick_collision_node_path, queue)
+            self.collision_traverser.add_collider(brick_collision_node_path, self.queue)
+
 
         nav_mesh = NodePath("navmesh")
         for node in self.level.find_all_matches("**/nav"):
             node.wrt_reparent_to(nav_mesh)
 
         nav_mesh.flatten_strong()
-        self.navgraph = NavGraph(mesh=nav_mesh.get_child(0), draw_graph=False)
+       # self.navgraph = NavGraph(mesh=nav_mesh.get_child(0), draw_graph=False)
         nav_mesh.remove_node()
 
         self.level.flatten_strong()
+        
 
     def make_brick_at(self, x, y):
         if (x, y) not in self.layout:
@@ -135,11 +139,11 @@ class Bricks:
         self.make_brick_at(x, y - 1)
         self.make_brick_at(x, y + 1)
 
-    def load_from_image(self, NavGraph, trav, pusher, img_file):
+    def load_from_image(self, img_file):
         img = PNMImage()
         img.read(img_file)
         for x in range(img.get_x_size()):
             for y in range(img.get_y_size()):
                 img.get_gray(x, y) < 0.5 and self.add(x, y)
 
-        self.generate(NavGraph, trav, pusher)
+        self.generate()
